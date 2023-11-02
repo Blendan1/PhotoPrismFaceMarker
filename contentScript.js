@@ -1,6 +1,6 @@
 const config = {attributes: false, childList: true, subtree: true};
 
-const useSquare = false;
+const useSquare = true;
 
 // Callback function to execute when mutations are observed
 const callback = function (mutationsList, observer) {
@@ -15,11 +15,6 @@ const callback = function (mutationsList, observer) {
                     facesContainer.prepend(btn);
 
                     btn.onclick = markFace;
-
-                    //document.querySelector(".p-tab.p-tab-photo-people").__vue__.$props.model.getMarkers(true)
-                    //model.thumbnailUrl("fit_1280")
-                    //document.querySelector(".p-tab.p-tab-photo-people").__vue__.$api.post("markers", {FileUID: "fs3f7jk1w10gauk1",X: 0, Y: 0, W: 1, H: 1, SubjSrc: "manual"})
-                    //document.querySelector(".p-tab.p-tab-photo-people").__vue__.$props.model.load()
                 }, 1);
             }
         }
@@ -32,7 +27,8 @@ function markFace() {
     const api = vue.$api;
 
     async function addMarker(x, y, w, h) {
-        await api.post("markers", {FileUID: model.Files[0].UID, X: x, Y: y, W: w, H: h, SubjSrc: "manual"});
+        const file = model.Files.find(f => f.Primary);
+        await api.post("markers", {FileUID: file.UID, X: x, Y: y, W: w, H: h, SubjSrc: "manual"});
         await model.load();
         vue.$data.markers = model.getMarkers(true);
     }
@@ -66,19 +62,49 @@ function markFace() {
                     div.style.top = (marker.Y * height) + "px";
                     div.style.height = (marker.H * height) + "px";
                     div.style.width = (marker.W * width) + "px";
+
+                    div.title = marker.Name;
+
                     drawPlane.prepend(div);
                 });
-                console.log(markers);
             }
 
             renderExisting();
 
             drawPlane.oncontextmenu = function (e) {
                 e.preventDefault();
-                container.remove();
+                if (isDrawing) {
+                    if (draw.obj) {
+                        draw.obj.remove();
+                    }
+                    draw = {};
+                    isDrawing = false;
+                } else {
+                    container.remove();
+                }
             };
 
             let draw = {}, isDrawing = false;
+
+            function setDrawMax() {
+                if (useSquare) {
+                    let maxDim = Math.abs(Math.max(Math.abs(draw.w), Math.abs(draw.h)));
+                    if(draw.w < 0) {
+                        maxDim = Math.min(draw.x, maxDim);
+                    } else {
+                        maxDim = Math.min(width - draw.x, maxDim);
+                    }
+
+                    if(draw.h < 0) {
+                        maxDim = Math.min(draw.y, maxDim);
+                    } else {
+                        maxDim = Math.min(height - draw.y, maxDim);
+                    }
+
+                    draw.w = maxDim * (draw.w < 0 ? -1 : 1);
+                    draw.h = maxDim * (draw.h < 0 ? -1 : 1);
+                }
+            }
 
             function changeDraw() {
                 if (!draw.obj) {
@@ -88,31 +114,26 @@ function markFace() {
                     drawPlane.appendChild(draw.obj);
                 }
 
-                let maxDim = null;
+                setDrawMax();
 
                 let x = draw.w < 0 ? draw.x - Math.abs(draw.w) : draw.x;
                 let y = draw.h < 0 ? draw.y - Math.abs(draw.h) : draw.y;
-
-                if(useSquare) {
-                    maxDim = Math.max(Math.abs(draw.w), Math.abs(draw.h));
-                    x = maxDim < 0 ? draw.x - Math.abs(maxDim) : draw.x;
-                    y = maxDim < 0 ? draw.y - Math.abs(maxDim) : draw.y;
-                }
                 draw.obj.style.left = x + "px";
                 draw.obj.style.top = y + "px";
-                draw.obj.style.width = Math.abs(maxDim === null ? draw.w : maxDim) + "px";
-                draw.obj.style.height = Math.abs(maxDim === null ? draw.h : maxDim) + "px";
+                draw.obj.style.width = Math.abs(draw.w) + "px";
+                draw.obj.style.height = Math.abs(draw.h) + "px";
             }
 
             drawPlane.onmousedown = function (e) {
                 e.preventDefault();
 
+                //right click is handelt separately
+                if (e.which === 3 || e.button === 2) {
+                    return;
+                }
+
                 if (isDrawing) {
-                    if (useSquare) {
-                        const maxDim = Math.max(Math.abs(draw.w), Math.abs(draw.h));
-                        draw.w = maxDim;
-                        draw.h = maxDim;
-                    }
+                    setDrawMax();
                     let x = draw.w < 0 ? draw.x - Math.abs(draw.w) : draw.x;
                     let y = draw.h < 0 ? draw.y - Math.abs(draw.h) : draw.y;
                     let w = Math.abs(draw.w);
@@ -185,23 +206,7 @@ setTimeout(() => {
     const targetNode = document.getElementById('app');
     // Create an observer instance linked to the callback function
     const observer = new MutationObserver(callback);
-    console.log(targetNode);
     // Start observing the target node for configured mutations
     observer.observe(targetNode, config);
 
 }, 1000);
-
-// Receive message with new coordinates
-top.window.addEventListener("message", function (message) {
-    console.log(message.data);
-    setTimeout(function () {
-        // This is necessary because Vue.js responds by default to the input event rather than change event
-        var event = new Event('input');
-        var leftBox = document.getElementsByClassName('input-latitude')[0];
-        leftBox.firstChild.firstChild.firstChild.childNodes[1].value = message.data.coordinates.lat;
-        leftBox.firstChild.firstChild.firstChild.childNodes[1].dispatchEvent(event);
-        var rightBox = document.getElementsByClassName('input-longitude')[0];
-        rightBox.firstChild.firstChild.firstChild.childNodes[1].value = message.data.coordinates.lon;
-        rightBox.firstChild.firstChild.firstChild.childNodes[1].dispatchEvent(event);
-    }, 10);
-});
