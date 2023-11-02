@@ -1,5 +1,7 @@
 const config = {attributes: false, childList: true, subtree: true};
 
+const useSquare = false;
+
 // Callback function to execute when mutations are observed
 const callback = function (mutationsList, observer) {
     for (const mutation of mutationsList) {
@@ -51,6 +53,26 @@ function markFace() {
             drawPlane.style.left = "0";
             container.append(drawPlane);
 
+            function renderExisting() {
+                drawPlane.querySelectorAll(".marker").forEach(m => m.remove());
+                const markers = model.getMarkers(true);
+                markers.forEach(marker => {
+                    const div = document.createElement("div");
+                    div.classList.add("marker");
+                    div.style.border = "2px dotted gray";
+                    div.style.position = "absolute";
+
+                    div.style.left = (marker.X * width) + "px";
+                    div.style.top = (marker.Y * height) + "px";
+                    div.style.height = (marker.H * height) + "px";
+                    div.style.width = (marker.W * width) + "px";
+                    drawPlane.prepend(div);
+                });
+                console.log(markers);
+            }
+
+            renderExisting();
+
             drawPlane.oncontextmenu = function (e) {
                 e.preventDefault();
                 container.remove();
@@ -66,33 +88,45 @@ function markFace() {
                     drawPlane.appendChild(draw.obj);
                 }
 
-                const maxDim = Math.max(Math.abs(draw.w), Math.abs(draw.h));
+                let maxDim = null;
 
-                const x =maxDim < 0 ? draw.x - Math.abs(maxDim) : draw.x;
-                const y =maxDim < 0 ? draw.y - Math.abs(maxDim) : draw.y;
+                let x = draw.w < 0 ? draw.x - Math.abs(draw.w) : draw.x;
+                let y = draw.h < 0 ? draw.y - Math.abs(draw.h) : draw.y;
+
+                if(useSquare) {
+                    maxDim = Math.max(Math.abs(draw.w), Math.abs(draw.h));
+                    x = maxDim < 0 ? draw.x - Math.abs(maxDim) : draw.x;
+                    y = maxDim < 0 ? draw.y - Math.abs(maxDim) : draw.y;
+                }
                 draw.obj.style.left = x + "px";
                 draw.obj.style.top = y + "px";
-                draw.obj.style.height = Math.abs(maxDim) + "px";
-                draw.obj.style.width = Math.abs(maxDim) + "px";
+                draw.obj.style.width = Math.abs(maxDim === null ? draw.w : maxDim) + "px";
+                draw.obj.style.height = Math.abs(maxDim === null ? draw.h : maxDim) + "px";
             }
 
             drawPlane.onmousedown = function (e) {
                 e.preventDefault();
 
-                if(isDrawing) {
-                    const maxDim = Math.max(Math.abs(draw.w), Math.abs(draw.h));
-                    let x = maxDim < 0 ? draw.x - Math.abs(maxDim) : draw.x;
-                    let y = maxDim < 0 ? draw.y - Math.abs(maxDim) : draw.y;
-                    let h = Math.abs(maxDim);
-                    let w = Math.abs(maxDim);
+                if (isDrawing) {
+                    if (useSquare) {
+                        const maxDim = Math.max(Math.abs(draw.w), Math.abs(draw.h));
+                        draw.w = maxDim;
+                        draw.h = maxDim;
+                    }
+                    let x = draw.w < 0 ? draw.x - Math.abs(draw.w) : draw.x;
+                    let y = draw.h < 0 ? draw.y - Math.abs(draw.h) : draw.y;
+                    let w = Math.abs(draw.w);
+                    let h = Math.abs(draw.h);
 
                     // photo prism works with relative numbers from 0-1
                     x = x / width;
-                    w = w / width;
                     y = y / height;
+                    w = w / width;
                     h = h / height;
-                    console.log(x, y, h, w);
-                    addMarker(x, y, h, w);
+
+                    addMarker(x, y, w, h).then(() => {
+                        renderExisting();
+                    });
 
                     draw.obj.remove();
                     isDrawing = false;
