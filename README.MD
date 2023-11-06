@@ -2,8 +2,6 @@
 
 This is a Chrome extension, that allows you to manually mark faces in your images
 
-## This project is currently in the working but still a needs a bit of work phase so be careful.
-
 ## installation:
 Download the source code from develop unzip it and open chrome://extensions from there you enable developer mode and then press "load unpacked".
 
