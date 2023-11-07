@@ -137,6 +137,7 @@
      * Opens the popup for marking faces
      */
     function markFace() {
+        const isMobile = isUserUsingMobile();
         const vue = document.querySelector(".p-tab.p-tab-photo-people").__vue__;
         const model = vue.$props.model;
         const api = vue.$api;
@@ -160,12 +161,12 @@
                 drawPlane.style.height = height + "px";
                 drawPlane.style.width = width + "px";
                 container.append(drawPlane);
-                drawPlane.classList.add("faces-extra-popup");
+                drawPlane.classList.add("faces-extra-popup" + (isMobile ? "-mobile" : ""));
 
                 renderExistingOn(drawPlane, model.getMarkers(true), width, height);
 
 
-                let draw = {}, isDrawing = false, isMove = false;
+                let draw = {}, isDrawing = false, isMove = false, isOnTarget = false, lastTouch = false;
 
                 function setDrawMax() {
                     draw.x = Math.max(draw.x, 0);
@@ -174,8 +175,15 @@
                     draw.x = Math.min(draw.x, width);
                     draw.y = Math.min(draw.y, height);
 
-                    if (useSquare) {
+                    if (isMove) {
+                        draw.x = Math.max(draw.x, (draw.w < 0 ? Math.abs(draw.w) : 0));
+                        draw.y = Math.max(draw.y, (draw.h < 0 ? Math.abs(draw.h) : 0));
+
+                        draw.x = Math.min(draw.x, width - (draw.w < 0 ? 0 : draw.w));
+                        draw.y = Math.min(draw.y, height - (draw.h < 0 ? 0 : draw.h));
+                    } else if (useSquare) {
                         let maxDim = Math.abs(Math.max(Math.abs(draw.w), Math.abs(draw.h)));
+
                         if (draw.w < 0) {
                             maxDim = Math.min(draw.x, maxDim);
                         } else {
@@ -188,16 +196,8 @@
                             maxDim = Math.min(height - draw.y, maxDim);
                         }
 
-                        if (isMove) {
-                            draw.x = Math.max(draw.x, (draw.w < 0 ? maxDim : 0));
-                            draw.y = Math.max(draw.y, (draw.h < 0 ? maxDim : 0));
-
-                            draw.x = Math.min(draw.x, width - (draw.w < 0 ? 0 : maxDim));
-                            draw.y = Math.min(draw.y, height - (draw.h < 0 ?  0 : maxDim));
-                        } else {
-                            draw.w = maxDim * (draw.w < 0 ? -1 : 1);
-                            draw.h = maxDim * (draw.h < 0 ? -1 : 1);
-                        }
+                        draw.w = maxDim * (draw.w < 0 ? -1 : 1);
+                        draw.h = maxDim * (draw.h < 0 ? -1 : 1);
                     }
                 }
 
@@ -209,6 +209,8 @@
                         const drawChild = document.createElement("div");
                         drawChild.classList.add("face-draw-child");
                         draw.obj.appendChild(drawChild);
+
+                        draw.obj.classList.add("face-draw");
 
 
                         drawPlane.appendChild(draw.obj);
@@ -241,119 +243,171 @@
                         renderExistingOn(drawPlane, model.getMarkers(true), width, height);
                     });
 
-                    draw.obj.remove();
+                    draw.obj?.remove();
+                    draw = {};
                     isDrawing = false;
+                    setSaveCancelBtn();
                 }
 
-                const isMobile = isUserUsingMobile();
-
-                if (isMobile) {
-                    drawPlane.ontouchstart = function (e) {
-                        if (!isDrawing) {
-                            isDrawing = true;
-                            draw = {
-                                x: e.touches[0].clientX - image.getBoundingClientRect().left,
-                                y: e.touches[0].clientY - (image.getBoundingClientRect().top),
-                                w: 0,
-                                h: 0,
-                            };
-
-                            changeDraw();
-                        } else {
-                            if (e.target.classList.contains("face-draw-child")) {
-                                draw.Lx = e.touches[0].clientX;
-                                draw.Ly = e.touches[0].clientY;
-                                isMove = true;
-                            } else {
-                                draw.w = (e.touches[0].clientX - image.getBoundingClientRect().left) - draw.x;
-                                draw.h = (e.touches[0].clientY - image.getBoundingClientRect().top) - draw.y;
-                                changeDraw();
-                            }
-                        }
-                    };
-
-                    drawPlane.ontouchmove = function (e) {
-                        if (isDrawing) {
-                            if (isMove) {
-                                draw.x += e.touches[0].clientX - draw.Lx;
-                                draw.y += e.touches[0].clientY - draw.Ly;
-                                draw.Lx = e.touches[0].clientX;
-                                draw.Ly = e.touches[0].clientY;
-                            } else {
-                                draw.w = (e.touches[0].clientX - image.getBoundingClientRect().left) - draw.x;
-                                draw.h = (e.touches[0].clientY - image.getBoundingClientRect().top) - draw.y;
-                            }
-                            changeDraw();
-                        }
-                    };
-
-                    drawPlane.ontouchend = function (e) {
-                        isMove = false;
-                    };
-                } else {
-                    drawPlane.oncontextmenu = function (e) {
-                        e.preventDefault();
-                        if (isDrawing) {
-                            if (draw.obj) {
-                                draw.obj.remove();
-                            }
-                            draw = {};
-                            isDrawing = false;
-                        } else {
-                            container.remove();
-                        }
-                    };
-
-                    drawPlane.onmousedown = function (e) {
-                        e.preventDefault();
-
-                        //right click is handelt separately
-                        if (e.which === 3 || e.button === 2) {
-                            return;
-                        }
-
-                        if (isDrawing) {
-                            saveDraw();
-                            return;
-                        }
-
-                        if (draw.obj) {
-                            draw.obj.remove();
-                        }
-
+                function onClick(x, y, target) {
+                    if (!isDrawing) {
+                        isDrawing = true;
+                        isOnTarget = true;
                         draw = {
-                            x: e.clientX - (image.getBoundingClientRect().left),
-                            y: e.clientY - (image.getBoundingClientRect().top),
+                            x: x - image.getBoundingClientRect().left,
+                            y: y - image.getBoundingClientRect().top,
                             w: 0,
                             h: 0,
                         };
-                        isDrawing = true;
+                        setSaveCancelBtn();
                         changeDraw();
+                    } else {
+                        isMove = target.classList.contains("face-draw-child");
+                        isOnTarget = target.classList.contains("face-draw");
+                    }
+                    draw.Lx = x;
+                    draw.Ly = y;
+                }
+
+                function onMouseMove(x, y) {
+                    if (isDrawing && (isOnTarget || isMove)) {
+                        if (isMove) {
+                            draw.x += x - draw.Lx;
+                            draw.y += y - draw.Ly;
+                        } else {
+                            draw.w += x - draw.Lx;
+                            draw.h += y - draw.Ly;
+                        }
+
+                        draw.Lx = x;
+                        draw.Ly = y;
+                        changeDraw();
+                    }
+                }
+
+                const btnContainer = document.createElement('div');
+                const btnClose = document.createElement('button');
+                btnClose.className = 'compact action-close v-btn v-btn--depressed theme--light secondary-light faces-extra-popup-button';
+                btnClose.innerHTML = "<i aria-hidden=\"true\" class=\"v-icon material-icons theme--dark\" style=\"font-size: 18px;\">clear</i>";
+                btnClose.onclick = function () {
+                    container.remove();
+                };
+
+                const btnSave = document.createElement('button');
+                const btnCancel = document.createElement('button');
+                btnSave.className = 'v-btn v-btn--depressed theme--dark primary-button';
+                btnSave.innerHTML = "<i aria-hidden=\"true\" class=\"v-icon material-icons theme--dark\" style=\"font-size: 18px;\">save</i>";
+                btnCancel.className = 'compact action-close v-btn v-btn--depressed theme--light secondary-light';
+                btnCancel.innerHTML = "<i aria-hidden=\"true\" class=\"v-icon material-icons theme--dark\" style=\"font-size: 18px;\">clear</i>";
+
+                btnContainer.classList.add("faces-extra-popup-buttons");
+
+                btnContainer.append(btnCancel);
+
+                btnCancel.onclick = function () {
+                    if (draw.obj) {
+                        draw.obj.remove();
+                    }
+                    draw = {};
+                    isDrawing = false;
+                    setSaveCancelBtn();
+                };
+
+                btnContainer.append(btnSave);
+
+                btnSave.onclick = function () {
+                    saveDraw();
+                };
+
+                container.append(btnContainer);
+                container.append(btnClose);
+
+                function setSaveCancelBtn() {
+                    btnContainer.style.display = isDrawing ? "flex" : "none";
+                    btnClose.style.display = !isDrawing ? "block" : "none";
+                }
+
+                setSaveCancelBtn();
+
+                if (isMobile) {
+                    drawPlane.ontouchstart = function (e) {
+                        lastTouch = true;
+                        onClick(e.touches[0].clientX, e.touches[0].clientY, e.target);
                     };
 
-                    drawPlane.onmousemove = function (e) {
-                        if (isDrawing) {
-                            draw.w = (e.clientX - image.getBoundingClientRect().left) - draw.x;
-                            draw.h = (e.clientY - image.getBoundingClientRect().top) - draw.y;
-                            changeDraw();
-                        }
+                    drawPlane.ontouchmove = function (e) {
+                        lastTouch = true;
+                        e.preventDefault();
+                        onMouseMove(e.touches[0].clientX, e.touches[0].clientY);
+                    };
+
+                    drawPlane.ontouchend = function () {
+                        lastTouch = true;
+                        isMove = false;
                     };
                 }
+
+                drawPlane.oncontextmenu = function (e) {
+                    e.preventDefault();
+                    if(lastTouch) {
+                        return;
+                    }
+                    if (isDrawing) {
+                        if (draw.obj) {
+                            draw.obj.remove();
+                        }
+                        draw = {};
+                        isDrawing = false;
+                        setSaveCancelBtn();
+                    } else {
+                        container.remove();
+                    }
+                };
+
+                drawPlane.onmousedown = function (e) {
+                    e.preventDefault();
+                    //right click is handelt separately
+                    if (e.which === 3 || e.button === 2) {
+                        return;
+                    }
+                    lastTouch = false;
+                    onClick(e.clientX, e.clientY, e.target);
+                };
+
+                drawPlane.ondblclick = function (e) {
+                    lastTouch = false;
+                    if (e.target.classList.contains("face-draw-child")) {
+                        saveDraw();
+                    }
+                };
+
+                drawPlane.onmouseup = function () {
+                    lastTouch = false;
+                    isMove = false;
+                    isOnTarget = false;
+                };
+
+                drawPlane.onmousemove = function (e) {
+                    onMouseMove(e.clientX, e.clientY);
+                };
             }, 100);
         };
 
         image.src = model.thumbnailUrl("fit_1280");
 
-        image.style.maxWidth = "100vw";
-        image.style.maxHeight = "100vh";
-        image.classList.add("faces-extra-popup");
+        if (!isMobile) {
+            image.style.maxWidth = "100vw";
+            image.style.maxHeight = "100vh";
+        } else {
+            container.style.overflow = "auto";
+        }
+        image.classList.add("faces-extra-popup" + (isMobile ? "-mobile" : ""));
 
         container.append(image);
 
         container.classList.add("faces-extra-popup-container");
 
         document.body.append(container);
-
     }
 
     {
@@ -376,8 +430,14 @@
                 .faces-extra-popup {
                     position: absolute;
                     left: 50%;
+                    top: 50%;
+                    transform: translateX(-50%) translateY(-50%) !important;
+                }
+
+                .faces-extra-popup-mobile {
+                    position: absolute;
+                    left: 0;
                     top: 0;
-                    transform: translateX(-50%) !important;
                 }
 
                 .faces-extra-popup-container {
@@ -396,6 +456,29 @@
                     left: 10%;
                     width: 80%;
                     height: 80%;
+                    cursor: move;
+                }
+
+                .face-draw {
+                    cursor: se-resize;
+                }
+
+                .faces-extra-popup-buttons {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    position: fixed;
+                    bottom: 5px;
+                    left: 0;
+                }
+
+                .faces-extra-popup-button {
+                    display: block;
+                    justify-content: center;
+                    align-items: center;
+                    position: fixed !important;
+                    bottom: 5px;
+                    left: 0;
                 }
             `;
             document.head.appendChild(style);
