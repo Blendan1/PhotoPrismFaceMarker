@@ -189,3 +189,6 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
+.idea/deployment.xml
+.idea/sshConfigs.xml
+
