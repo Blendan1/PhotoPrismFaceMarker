@@ -12,7 +12,7 @@
   "host_permissions": ["http:\/\/*\/*", "https:\/\/*\/*"],
   "content_scripts": [
     {
-      "matches": ["*://*/browse*", "*://*/library*"],
+      "matches": ["*://*/*browse*", "*://*/*library*"],
       "js": ["contentScript.js"],
       "world": "MAIN"
     }

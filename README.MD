@@ -23,3 +23,6 @@ All changes will be saved instantly, no need to save separately.
 
 I will improve the UI and the documentation in the coming days, if there are and issues or questions fell free to open an issue 
 
+## Limiting the Site Access
+
+In case the augmented buttons for manipulating face markers appear in websites other than your PhotoPrism service, you might want to limit the Site access permission to your PhotoPrism server domain. To locate the permission settings, open extensions (`chrome://extensions`) > PhotoPrism Face Marker "Details" > Site Access.
