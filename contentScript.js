@@ -31,13 +31,26 @@
 
     let displayOpen = false;
 
+    function getModel() {
+        const scopes = document.getElementById("app").__vue_app__.config.globalProperties.$view.scopes;
+        for (const scope of scopes) {
+            if (scope._.type.name === "PPhotoEditDialog") {
+                return scope._.data.model;
+            }
+        }
+    }
+
+    function getApi() {
+        return  document.getElementById("app").__vue_app__.config.globalProperties.$api;
+    }
+
     /** Callback function to execute when mutations are observed
      * Is used manipulate the HTML
      */
     const callback = function (mutationsList) {
         for (const mutation of mutationsList) {
             if (mutation.type === 'childList') {
-                if (mutation.addedNodes[0] !== undefined && mutation.addedNodes[0].className === 'p-tab p-tab-photo-people') {
+                if (mutation.addedNodes[0] !== undefined && (mutation.addedNodes[0].className === 'p-tab p-tab-photo-people' || mutation.addedNodes[0]?.querySelector?.(".p-tab.p-tab-photo-people"))) {
                     setTimeout(function () {
                         const facesContainer = document.querySelector('.p-tab-photo-people > .p-faces');
                         //#region Adding Full image preview
@@ -51,17 +64,17 @@
                         img.onload = function () {
                             imgContainer.style.height = img.offsetHeight + "px";
                             imgContainer.style.width = img.offsetWidth + "px";
-                            const model = document.querySelector(".p-tab.p-tab-photo-people").__vue__.$props.model;
-                            renderExistingOn(imgContainer, model.getMarkers(true),
+                            renderExistingOn(imgContainer, getModel().getMarkers(true),
                                 img.offsetWidth, img.offsetHeight);
                         };
 
                         new IntersectionObserver((entries) => {
                             entries.forEach(entry => {
                                 if (entry.intersectionRatio > 0) {
-                                    const vue = document.querySelector(".p-tab.p-tab-photo-people").__vue__;
-                                    const model = vue.$props.model;
-                                    img.src = model.thumbnailUrl("fit_1280");
+                                    const url = document.querySelector(".form-thumb img").getAttribute("src")
+                                    const split = url.split("/");
+                                    split[split.length - 1] = "fit_1280";
+                                    img.src = split.join("/");
                                 }
                             });
                         }).observe(img);
@@ -70,7 +83,7 @@
 
                         {
                             const btn = document.createElement('button');
-                            btn.className = 'v-btn v-btn--depressed theme--dark primary-button';
+                            btn.className = 'v-btn v-btn--flat v-theme--carbon bg-button v-btn--density-default v-btn--size-default';
                             facesContainer.prepend(btn);
                             btn.onclick = function () {
                                 displayOpen = !displayOpen;
@@ -81,10 +94,10 @@
 
                             function setIsOpen() {
                                 if (displayOpen) {
-                                    btn.innerHTML = "<i aria-hidden=\"true\" class=\"v-icon material-icons theme--light\" style=\"font-size: 18px;\">arrow_drop_down</i>";
+                                    btn.innerHTML = "<i aria-hidden=\"true\" class=\"mdi-arrow-down-bold mdi v-icon notranslate v-theme--carbon\" style=\"font-size: 18px;\"></i>";
                                     imgContainer.style.display = "block";
                                 } else {
-                                    btn.innerHTML = "<i aria-hidden=\"true\" class=\"v-icon material-icons theme--light\" style=\"font-size: 18px;\">arrow_drop_up</i>";
+                                    btn.innerHTML = "<i aria-hidden=\"true\" class=\"mdi-arrow-up-bold mdi v-icon notranslate v-theme--carbon\" style=\"font-size: 18px;\"></i>";
                                     imgContainer.style.display = "none";
                                 }
                             }
@@ -95,8 +108,8 @@
                         //#region Adding button for adding faces
                         {
                             const btn = document.createElement('button');
-                            btn.className = 'v-btn v-btn--depressed theme--dark primary-button';
-                            btn.innerHTML = "<i aria-hidden=\"true\" class=\"v-icon material-icons theme--light\" style=\"font-size: 18px;\">add</i>";
+                            btn.className = 'v-btn v-btn--flat v-theme--carbon bg-button v-btn--density-default v-btn--size-default';
+                            btn.innerHTML = "<i aria-hidden=\"true\" class=\"mdi-plus mdi v-icon notranslate v-theme--carbon\" style=\"font-size: 18px;\"></i>";
                             facesContainer.prepend(btn);
                             btn.onclick = markFace;
                         }
@@ -138,15 +151,14 @@
      */
     function markFace() {
         const isMobile = isUserUsingMobile();
-        const vue = document.querySelector(".p-tab.p-tab-photo-people").__vue__;
-        const model = vue.$props.model;
-        const api = vue.$api;
+        const model = getModel();
+        const api = getApi();
 
         async function addMarker(x, y, w, h) {
             const file = model.Files.find(f => f.Primary);
             await api.post("markers", {FileUID: file.UID, X: x, Y: y, W: w, H: h, SubjSrc: "manual"});
             await model.load();
-            vue.$data.markers = model.getMarkers(true);
+            model.Files[0].Markers = model.getMarkers(true);
         }
 
         const container = document.createElement("div");
@@ -166,7 +178,8 @@
                 renderExistingOn(drawPlane, model.getMarkers(true), width, height);
 
 
-                let draw = {}, isDrawing = false, isMove = false, isOnTarget = false, lastTouch = false;
+                let draw = {}, isDrawing = false, isMove = false, isOnTarget = false, lastTouch = false
+                    , isScroll = false;
 
                 function setDrawMax() {
                     draw.x = Math.max(draw.x, 0);
@@ -287,18 +300,18 @@
 
                 const btnContainer = document.createElement('div');
                 const btnClose = document.createElement('button');
-                btnClose.className = 'compact action-close v-btn v-btn--depressed theme--light secondary-light faces-extra-popup-button';
-                btnClose.innerHTML = "<i aria-hidden=\"true\" class=\"v-icon material-icons theme--dark\" style=\"font-size: 18px;\">clear</i>";
+                btnClose.className = 'v-btn v-btn--flat v-theme--carbon bg-button v-btn--density-default v-btn--size-default faces-extra-popup-button';
+                btnClose.innerHTML = "<i aria-hidden=\"true\" class=\"mdi-close mdi v-icon notranslate v-theme--carbon\" style=\"font-size: 18px;\"></i>";
                 btnClose.onclick = function () {
                     container.remove();
                 };
 
                 const btnSave = document.createElement('button');
                 const btnCancel = document.createElement('button');
-                btnSave.className = 'v-btn v-btn--depressed theme--dark primary-button';
-                btnSave.innerHTML = "<i aria-hidden=\"true\" class=\"v-icon material-icons theme--dark\" style=\"font-size: 18px;\">save</i>";
-                btnCancel.className = 'compact action-close v-btn v-btn--depressed theme--light secondary-light';
-                btnCancel.innerHTML = "<i aria-hidden=\"true\" class=\"v-icon material-icons theme--dark\" style=\"font-size: 18px;\">clear</i>";
+                btnSave.className = 'v-btn v-btn--flat v-theme--carbon bg-button v-btn--density-default v-btn--size-default';
+                btnSave.innerHTML = "<i aria-hidden=\"true\" class=\"mdi-content-save mdi v-icon notranslate v-theme--carbon\" style=\"font-size: 18px;\"></i>";
+                btnCancel.className = 'v-btn v-btn--flat v-theme--carbon bg-button v-btn--density-default v-btn--size-default';
+                btnCancel.innerHTML = "<i aria-hidden=\"true\" class=\"mdi-close mdi v-icon notranslate v-theme--carbon\" style=\"font-size: 18px;\"></i>";
 
                 btnContainer.classList.add("faces-extra-popup-buttons");
 
@@ -322,6 +335,8 @@
                 container.append(btnContainer);
                 container.append(btnClose);
 
+
+
                 function setSaveCancelBtn() {
                     btnContainer.style.display = isDrawing ? "flex" : "none";
                     btnClose.style.display = !isDrawing ? "block" : "none";
@@ -330,15 +345,39 @@
                 setSaveCancelBtn();
 
                 if (isMobile) {
+                    const btnMove = document.createElement('button');
+                    btnMove.className = 'compact action-close v-btn v-btn--depressed theme--light secondary-light faces-extra-popup-button-scroll';
+
+                    function setIcon() {
+                        if (!isScroll) {
+                            btnMove.innerHTML = "<i aria-hidden=\"true\" class=\"v-icon material-icons theme--dark\" style=\"font-size: 18px;\">open_with</i>";
+                        } else {
+                            btnMove.innerHTML = "<i aria-hidden=\"true\" class=\"v-icon material-icons theme--dark\" style=\"font-size: 18px;\">block</i>";
+                        }
+                    }
+
+                    setIcon();
+
+                    btnMove.onclick = function () {
+                        isScroll = !isScroll;
+                        setIcon();
+                    };
+
+                    container.append(btnMove);
+
                     drawPlane.ontouchstart = function (e) {
-                        lastTouch = true;
-                        onClick(e.touches[0].clientX, e.touches[0].clientY, e.target);
+                        if (!isScroll) {
+                            lastTouch = true;
+                            onClick(e.touches[0].clientX, e.touches[0].clientY, e.target);
+                        }
                     };
 
                     drawPlane.ontouchmove = function (e) {
-                        lastTouch = true;
-                        e.preventDefault();
-                        onMouseMove(e.touches[0].clientX, e.touches[0].clientY);
+                        if (!isScroll) {
+                            lastTouch = true;
+                            e.preventDefault();
+                            onMouseMove(e.touches[0].clientX, e.touches[0].clientY);
+                        }
                     };
 
                     drawPlane.ontouchend = function () {
@@ -349,7 +388,7 @@
 
                 drawPlane.oncontextmenu = function (e) {
                     e.preventDefault();
-                    if(lastTouch) {
+                    if (lastTouch) {
                         return;
                     }
                     if (isDrawing) {
@@ -413,7 +452,7 @@
     {
         const installIntervall = setInterval(() => {
             // This node doesn't immediately exists so it's better to wait 1 second or so
-            const targetNode = document.getElementById('app');
+            const targetNode = document.getElementsByClassName('v-overlay-container')[0];
 
             if (!targetNode) {
                 return;
@@ -478,6 +517,15 @@
                     align-items: center;
                     position: fixed !important;
                     bottom: 5px;
+                    left: 0;
+                }
+                
+                .faces-extra-popup-button-scroll {
+                    display: block;
+                    justify-content: center;
+                    align-items: center;
+                    position: fixed !important;
+                    top: 5px;
                     left: 0;
                 }
             `;
