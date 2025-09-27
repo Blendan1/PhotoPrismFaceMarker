@@ -40,6 +40,16 @@
         }
     }
 
+    async function reload() {
+        const scopes = document.getElementById("app").__vue_app__.config.globalProperties.$view.scopes;
+        for (const scope of scopes) {
+            if (scope._.type.name === "PPhotoEditDialog") {
+                await scope.find(scope._.data.selected + 1);
+                await scope.find(scope._.data.selected - 1);
+            }
+        }
+    }
+
     function getApi() {
         return  document.getElementById("app").__vue_app__.config.globalProperties.$api;
     }
@@ -94,10 +104,10 @@
 
                             function setIsOpen() {
                                 if (displayOpen) {
-                                    btn.innerHTML = "<i aria-hidden=\"true\" class=\"mdi-arrow-down-bold mdi v-icon notranslate v-theme--carbon\" style=\"font-size: 18px;\"></i>";
+                                    btn.innerHTML = "<i aria-hidden=\"true\" class=\"mdi-chevron-down mdi v-icon notranslate v-theme--carbon\" style=\"font-size: 18px;\"></i>";
                                     imgContainer.style.display = "block";
                                 } else {
-                                    btn.innerHTML = "<i aria-hidden=\"true\" class=\"mdi-arrow-up-bold mdi v-icon notranslate v-theme--carbon\" style=\"font-size: 18px;\"></i>";
+                                    btn.innerHTML = "<i aria-hidden=\"true\" class=\"mdi-chevron-up mdi v-icon notranslate v-theme--carbon\" style=\"font-size: 18px;\"></i>";
                                     imgContainer.style.display = "none";
                                 }
                             }
@@ -157,8 +167,7 @@
         async function addMarker(x, y, w, h) {
             const file = model.Files.find(f => f.Primary);
             await api.post("markers", {FileUID: file.UID, X: x, Y: y, W: w, H: h, SubjSrc: "manual"});
-            await model.load();
-            model.Files[0].Markers = model.getMarkers(true);
+            await reload();
         }
 
         const container = document.createElement("div");
@@ -346,13 +355,13 @@
 
                 if (isMobile) {
                     const btnMove = document.createElement('button');
-                    btnMove.className = 'compact action-close v-btn v-btn--depressed theme--light secondary-light faces-extra-popup-button-scroll';
+                    btnMove.className = 'v-btn v-btn--flat v-theme--carbon bg-button v-btn--density-default v-btn--size-default faces-extra-popup-button-scroll';
 
                     function setIcon() {
                         if (!isScroll) {
-                            btnMove.innerHTML = "<i aria-hidden=\"true\" class=\"v-icon material-icons theme--dark\" style=\"font-size: 18px;\">open_with</i>";
+                            btnMove.innerHTML = "<i aria-hidden=\"true\" class=\"mdi-cursor-move mdi v-icon notranslate v-theme--carbon\" style=\"font-size: 18px;\"></i>";
                         } else {
-                            btnMove.innerHTML = "<i aria-hidden=\"true\" class=\"v-icon material-icons theme--dark\" style=\"font-size: 18px;\">block</i>";
+                            btnMove.innerHTML = "<i aria-hidden=\"true\" class=\"mdi-cancel mdi v-icon notranslate v-theme--carbon\" style=\"font-size: 18px;\"></i>";
                         }
                     }
 
